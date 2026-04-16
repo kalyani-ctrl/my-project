@@ -1,0 +1,244 @@
+{
+  "name": "LinkedIn Company Page Visitor Enrichment",
+  "description": "Captures LinkedIn company page visitors via Chrome extension, deduplicates against existing Google Sheet records, enriches via Explorium, and saves new visitors",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "linkedin-visitors",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook - Chrome Extension",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Receives visitor data from Chrome extension. Expects: [{profileId, name, headline, company, email}]"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "resource": "spreadsheet"
+        },
+        "sheetName": "Visitors",
+        "options": {}
+      },
+      "id": "2",
+      "name": "Get Existing Visitors from Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        450,
+        200
+      ],
+      "notesInFlow": true,
+      "notes": "Read all existing visitor records to check for duplicates",
+      "credentials": {
+        "googleSheetsOAuth2": "google-sheets-credentials"
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get incoming visitors from webhook\nconst incomingVisitors = $input.all()[0].json.body;\n\n// Get existing visitors from Google Sheets\nconst existingVisitors = $input.all()[1].json.data || [];\n\n// Create a set of existing profile IDs and emails for fast lookup\nconst existingIds = new Set(existingVisitors.map(v => v.profileId));\nconst existingEmails = new Set(existingVisitors.map(v => v.email).filter(e => e));\n\n// Filter out duplicates\nconst newVisitors = incomingVisitors.filter(visitor => {\n  // Check if profile ID already exists\n  if (existingIds.has(visitor.profileId)) {\n    return false;\n  }\n  // Check if email already exists (if email is provided)\n  if (visitor.email && existingEmails.has(visitor.email)) {\n    return false;\n  }\n  return true;\n});\n\n// Add timestamp to new visitors\nconst visitorsWithTimestamp = newVisitors.map(v => ({\n  ...v,\n  timestamp: new Date().toISOString()\n}));\n\n// Return deduped visitors\nreturn [{\n  json: {\n    newVisitors: visitorsWithTimestamp,\n    newVisitorsCount: visitorsWithTimestamp.length,\n    totalIncomingCount: incomingVisitors.length,\n    duplicatesFound: incomingVisitors.length - visitorsWithTimestamp.length\n  }\n}];"
+      },
+      "id": "3",
+      "name": "Deduplicate Visitors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Compare incoming visitors with existing records. Filter out duplicates."
+    },
+    {
+      "parameters": {
+        "values": "={{ $json.newVisitors }}"
+      },
+      "id": "4",
+      "name": "Split Visitors for Processing",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 3,
+      "position": [
+        850,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Convert array to individual items for processing"
+    },
+    {
+      "parameters": {
+        "url": "https://api.explorium.ai/enrich",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParametersJson": "{\n  \"email\": \"{{ $json.email }}\",\n  \"name\": \"{{ $json.name }}\",\n  \"company\": \"{{ $json.company }}\",\n  \"firstName\": \"{{ $json.firstName || $json.name.split(' ')[0] }}\",\n  \"lastName\": \"{{ $json.lastName || $json.name.split(' ').pop() }}\"\n}",
+        "options": {}
+      },
+      "id": "5",
+      "name": "Enrich via Explorium",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1050,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Call Explorium API to enrich visitor data. Replace endpoint if using different Explorium setup.",
+      "credentials": {
+        "httpHeaderAuth": "explorium-api-credentials"
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine original visitor data with Explorium enrichment results\nconst originalVisitor = $input.all()[0].json;\nconst enrichmentData = $input.all()[1].json || {};\n\nconst enrichedVisitor = {\n  // Original fields\n  profileId: originalVisitor.profileId,\n  name: originalVisitor.name,\n  headline: originalVisitor.headline,\n  company: originalVisitor.company,\n  email: originalVisitor.email,\n  linkedinUrl: originalVisitor.linkedinUrl,\n  timestamp: originalVisitor.timestamp,\n  \n  // Enriched fields from Explorium\n  phone: enrichmentData.phone || '',\n  address: enrichmentData.address || '',\n  industry: enrichmentData.industry || '',\n  companySize: enrichmentData.companySize || '',\n  revenue: enrichmentData.revenue || '',\n  yearsAtCompany: enrichmentData.yearsAtCompany || '',\n  linkedinConnections: enrichmentData.linkedinConnections || '',\n  skills: enrichmentData.skills ? enrichmentData.skills.join(', ') : '',\n  workHistory: enrichmentData.workHistory ? enrichmentData.workHistory.map(w => `${w.title} at ${w.company}`).join(' | ') : '',\n  \n  // Metadata\n  dataSource: 'LinkedIn Company Visitors + Explorium Enrichment',\n  enrichedAt: new Date().toISOString()\n};\n\nreturn [{\n  json: enrichedVisitor\n}];"
+      },
+      "id": "6",
+      "name": "Merge Enrichment Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Merge original visitor data with Explorium enrichment results"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "resource": "spreadsheet"
+        },
+        "sheetName": "Visitors",
+        "columns": "profileId,name,email,headline,company,phone,address,industry,companySize,linkedinUrl,timestamp,enrichedAt,skills,workHistory",
+        "options": {}
+      },
+      "id": "7",
+      "name": "Append to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1450,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Append enriched visitor record to Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2": "google-sheets-credentials"
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "return [\n  {\n    \"json\": {\n      \"success\": true,\n      \"message\": \"Processing complete\",\n      \"newVisitorsProcessed\": $('3').getWorkflowData().nodes[3].data.main[0].length,\n      \"timestamp\": new Date().toISOString()\n    }\n  }\n];"
+      },
+      "id": "8",
+      "name": "Return Success Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Return success response to webhook caller"
+    }
+  ],
+  "connections": {
+    "1": {
+      "main": [
+        [
+          {
+            "node": "2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2": {
+      "main": [
+        [
+          {
+            "node": "3",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "3": {
+      "main": [
+        [
+          {
+            "node": "4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4": {
+      "main": [
+        [
+          {
+            "node": "5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5": {
+      "main": [
+        [
+          {
+            "node": "6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6": {
+      "main": [
+        [
+          {
+            "node": "7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7": {
+      "main": [
+        [
+          {
+            "node": "8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

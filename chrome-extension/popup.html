@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn Visitor Enrichment</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            width: 400px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            padding: 15px;
+            border-radius: 8px 8px 0 0;
+            text-align: center;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .content {
+            background: white;
+            padding: 15px;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-weight: 600;
+            font-size: 13px;
+            color: #667eea;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: #555;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        input[type="url"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: monospace;
+            margin-bottom: 8px;
+            transition: border-color 0.2s;
+        }
+
+        input[type="url"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e8e8;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin-bottom: 10px;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .status.error {
+            background: #fee2e2;
+            color: #7f1d1d;
+            border: 1px solid #fca5a5;
+        }
+
+        .status.info {
+            background: #dbeafe;
+            color: #0c2340;
+            border: 1px solid #93c5fd;
+        }
+
+        .stats {
+            background: #f9fafb;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            font-weight: 500;
+            color: #555;
+        }
+
+        .stat-value {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .visitor-count {
+            background: #667eea;
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: none;
+        }
+
+        .visitor-count.show {
+            display: block;
+        }
+
+        .note {
+            background: #fef3c7;
+            border-left: 3px solid #f59e0b;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #78350f;
+            margin-top: 10px;
+        }
+
+        .loading {
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 5px;
+        }
+
+        a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .section-divider {
+            height: 1px;
+            background: #e5e7eb;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔗 LinkedIn Visitors</h1>
+            <p>Enrichment via Explorium</p>
+        </div>
+
+        <div class="content">
+            <!-- Status Messages -->
+            <div id="status" class="status"></div>
+
+            <!-- Configuration Section -->
+            <div class="section">
+                <div class="section-title">Configuration</div>
+                <label for="webhookUrl">N8n Webhook URL:</label>
+                <input
+                    type="url"
+                    id="webhookUrl"
+                    placeholder="https://n8n.example.com/webhook/linkedin-visitors"
+                    required
+                >
+                <button class="btn-primary" onclick="saveWebhookUrl()">Save Webhook URL</button>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <!-- Capture Section -->
+            <div class="section">
+                <div class="section-title">Capture Visitors</div>
+                <div class="visitor-count" id="visitorCount"></div>
+                <button class="btn-success" onclick="captureVisitors()">
+                    <span id="captureButtonText">📊 Capture Page Visitors</span>
+                </button>
+                <button class="btn-secondary" onclick="sendCapturedVisitors()">
+                    <span id="sendButtonText">📤 Send to N8n</span>
+                </button>
+                <p class="note">
+                    💡 Make sure you're on a LinkedIn company page and have already configured your webhook URL.
+                </p>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <!-- Statistics Section -->
+            <div class="section">
+                <div class="section-title">Statistics</div>
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Captured:</span>
+                        <span class="stat-value" id="totalCaptured">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Last Capture:</span>
+                        <span class="stat-value" id="lastCapture">-</span>
+                    </div>
+                </div>
+                <button class="btn-secondary" onclick="refreshStats()" style="width: 100%; margin-top: 10px;">
+                    🔄 Refresh Stats
+                </button>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <!-- Help Section -->
+            <div class="section">
+                <div class="section-title">Need Help?</div>
+                <p style="font-size: 12px; color: #666; line-height: 1.5;">
+                    See the <a href="#" onclick="openDocumentation()">setup guide</a> for detailed instructions on:<br>
+                    • Configuring your N8n webhook<br>
+                    • Setting up Explorium API<br>
+                    • Creating your Google Sheet
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
